@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fake News Detector (Gemini)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0b1020;
+      color: #e8eaf6;
+      padding: 20px;
+    }
+    h1 { margin-bottom: 6px; }
+    .card {
+      background: #141a33;
+      padding: 16px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+    textarea, input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      margin-top: 8px;
+      border-radius: 8px;
+      border: 1px solid #2b3358;
+      background: #0f1530;
+      color: hsla(138, 42%, 94%, 0.76);
+    }
+    button {
+      margin-top: 12px;
+      padding: 12px 16px;
+      border: 0;
+      border-radius: 8px;
+      background: #6e8bff;
+      color: #0b1020;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .result { margin-top: 20px; padding: 16px; background: #141a33; border-radius: 12px; }
+    .badge {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+      background: #23294a;
+      margin-bottom: 10px;
+    }
+    .bar {
+      height: 10px;
+      background: #6e8bff;
+      margin: 10px 0;
+      width: 0%;
+      border-radius: 999px;
+      transition: width 0.4s ease;
+    }
+  </style>
+</head>
+<body>
+  <h1>🕵️‍♂️ Fake News Detector </br> Developed by:</br>EDEM EDEM - Cohort 3 fellow @ 3MTT Nigeria</h1>
+  <p>Paste text below to confirm the news.</p>
+
+  <div class="card">
+    <textarea id="textInput" rows="8" placeholder="Paste the article/post here..."></textarea>
+    <button id="checkBtn">Check Credibility</button>
+  </div>
+
+  <div id="status"></div>
+
+  <div id="result" class="result" style="display:none;">
+    <div class="badge" id="label"></div>
+    <div class="bar" id="confBar"></div>
+    <p id="rationale"></p>
+    <h3></h3>
+    <ul id="claims"></ul>
+    <h3></h3>
+    <ul id="sources"></ul>
+  </div>
+
+  <script>
+    const API_KEY = "AIzaSyBIYRunrnPpEbq1Gr5Xw5ZYfYCFA4io-Eo"; // ⚠️ Exposed if you publish this HTML
+    const MODEL = "gemini-2.5-flash";
+
+    const $ = id => document.getElementById(id);
+
+     function buildPrompt(userText) {
+  return `
+You are a fact-checking assistant. 
+Analyze the following claim and classify it as either TRUE or FALSE.
+
+CLAIM:
+"${userText}"
+
+REQUIREMENTS:
+- Respond ONLY with a valid JSON object.
+- Do NOT include any markdown, commentary, or text outside the JSON.
+- JSON format must be exactly:
+
+{
+  "label": "TRUE" or "FALSE",
+  "rationale": "One short sentence explanation"
+}`;
+}
+
+
+    async function checkCredibility() {
+      const text = $("textInput").value.trim();
+      if (!text) {
+        $("status").textContent = "Please enter some text.";
+        return;
+      }
+      $("status").textContent = "Analyzing...";
+      $("checkBtn").disabled = true;
+      $("result").style.display = "none";
+
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
+        const payload = {
+          contents: [{ role: "user", parts: [{ text: buildPrompt(text) }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 512,
+            responseMimeType: "application/json"
+          }
+        };
+
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          throw new Error("Gemini API error: " + res.status);
+        }
+
+        const data = await res.json();
+        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        let parsed;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          parsed = { label: "UNKNOWN", rationale: "Could not parse model response", confidence: 0, claims: [], suggested_sources: [] };
+        }
+
+        $("label").textContent = parsed.label || "UNKNOWN";
+        $("confBar").style.width = `${(parsed.confidence || 0) * 100}%`;
+        $("rationale").textContent = parsed.rationale || "";
+        $("claims").innerHTML = (parsed.claims || []).map(c => `<li>${c}</li>`).join("");
+        $("sources").innerHTML = (parsed.suggested_sources || []).map(s => `<li>${s}</li>`).join("");
+        $("result").style.display = "block";
+        $("status").textContent = "";
+      } catch (err) {
+        console.error(err);
+        $("status").textContent = "Error: " + err.message;
+      } finally {
+        $("checkBtn").disabled = false;
+      }
+    }
+
+    $("checkBtn").addEventListener("click", checkCredibility);
+  </script>
+</body>
+</html>
