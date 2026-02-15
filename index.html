@@ -6,122 +6,158 @@
   <title>Fake News Detector (Gemini)</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: #0b1020;
       color: #e8eaf6;
       padding: 20px;
+      line-height: 1.6;
     }
-    h1 { margin-bottom: 6px; }
+    h1 { margin-bottom: 6px; color: #6e8bff; }
+    .author-info { font-size: 0.9em; margin-bottom: 20px; color: #a1a1aa; }
     .card {
       background: #141a33;
-      padding: 16px;
+      padding: 20px;
       border-radius: 12px;
       margin-bottom: 20px;
+      border: 1px solid #2b3358;
     }
-    textarea, input {
+    textarea {
       width: 100%;
       box-sizing: border-box;
-      padding: 10px;
+      padding: 12px;
       margin-top: 8px;
       border-radius: 8px;
       border: 1px solid #2b3358;
       background: #0f1530;
-      color: hsla(138, 42%, 94%, 0.76);
+      color: #fff;
+      font-size: 16px;
+      resize: vertical;
     }
     button {
-      margin-top: 12px;
-      padding: 12px 16px;
+      margin-top: 15px;
+      padding: 12px 24px;
       border: 0;
       border-radius: 8px;
       background: #6e8bff;
       color: #0b1020;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
+      transition: background 0.3s;
     }
-    button:disabled { opacity: 0.6; cursor: not-allowed; }
-    .result { margin-top: 20px; padding: 16px; background: #141a33; border-radius: 12px; }
+    button:hover { background: #8ba3ff; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .result { 
+      margin-top: 20px; 
+      padding: 20px; 
+      background: #1c2541; 
+      border-radius: 12px; 
+      border-left: 5px solid #6e8bff;
+    }
     .badge {
       display: inline-block;
-      padding: 6px 10px;
+      padding: 6px 15px;
       border-radius: 999px;
-      font-weight: 700;
-      background: #23294a;
-      margin-bottom: 10px;
+      font-weight: 800;
+      background: #6e8bff;
+      color: #0b1020;
+      margin-bottom: 15px;
+      text-transform: uppercase;
+    }
+    .bar-container {
+      background: #0b1020;
+      border-radius: 10px;
+      height: 10px;
+      width: 100%;
+      margin: 10px 0;
+      overflow: hidden;
     }
     .bar {
-      height: 10px;
-      background: #6e8bff;
-      margin: 10px 0;
+      height: 100%;
+      background: #4ade80;
       width: 0%;
-      border-radius: 999px;
-      transition: width 0.4s ease;
+      transition: width 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 8px; }
+    #status { margin-top: 10px; font-style: italic; color: #6e8bff; }
   </style>
 </head>
 <body>
-  <h1>🕵️‍♂️ Fake News Detector </br> Developed by:</br>EDEM EDEM - Cohort 3 fellow @ 3MTT Nigeria</h1>
-  <p>Paste text below to confirm the news.</p>
+
+  <h1>🕵️‍♂️ Fake News Detector</h1>
+  <p class="author-info">Developed by: <strong>EDEM EDEM</strong> - Cohort 3 fellow @ 3MTT Nigeria</p>
 
   <div class="card">
-    <textarea id="textInput" rows="8" placeholder="Paste the article/post here..."></textarea>
+    <p>Paste text below to confirm the news.</p>
+    <textarea id="textInput" rows="6" placeholder="Paste the article, post, or claim here..."></textarea>
     <button id="checkBtn">Check Credibility</button>
+    <div id="status"></div>
   </div>
-
-  <div id="status"></div>
 
   <div id="result" class="result" style="display:none;">
     <div class="badge" id="label"></div>
-    <div class="bar" id="confBar"></div>
-    <p id="rationale"></p>
-    <h3></h3>
-    <ul id="claims"></ul>
-    <h3></h3>
-    <ul id="sources"></ul>
+    <p><strong>Confidence Level:</strong></p>
+    <div class="bar-container">
+      <div class="bar" id="confBar"></div>
+    </div>
+    <p id="rationale" style="font-size: 1.1em;"></p>
+    
+    <div id="extra-info">
+      <h3>Key Claims Analyzed:</h3>
+      <ul id="claims"></ul>
+      <h3>Suggested Sources:</h3>
+      <ul id="sources"></ul>
+    </div>
   </div>
 
   <script>
-    const API_KEY = "AIzaSyDwWvm1Ozag30Vmy8ORiOQPtZlstxZVftY"; // ⚠️ Exposed if you publish this HTML
-    const MODEL = "gemini-3-flash";
+    // --- CONFIGURATION ---
+    const API_KEY = "AIzaSyBnQyNp1nzZy9bL__X5zkjFDKdcckQdWpE"; // 👈 Paste your key here!
+    const MODEL = "gemini-1.5-flash"; // 👈 Changed from 'gemini-3-flash' to fix the 404
 
     const $ = id => document.getElementById(id);
 
-     function buildPrompt(userText) {
-  return `
-You are a fact-checking assistant. 
-Analyze the following claim and classify it as either TRUE or FALSE.
+    function buildPrompt(userText) {
+      return `
+        You are a professional fact-checking assistant. 
+        Analyze the following text and classify its credibility.
 
-CLAIM:
-"${userText}"
+        TEXT TO ANALYZE:
+        "${userText}"
 
-REQUIREMENTS:
-- Respond ONLY with a valid JSON object.
-- Do NOT include any markdown, commentary, or text outside the JSON.
-- JSON format must be exactly:
-
-{
-  "label": "TRUE" or "FALSE",
-  "rationale": "One short sentence explanation"
-}`;
-}
-
+        REQUIREMENTS:
+        - Respond ONLY with a valid JSON object.
+        - JSON format MUST be exactly:
+        {
+          "label": "TRUE" | "FALSE" | "MISLEADING" | "UNVERIFIED",
+          "confidence": 0.0 to 1.0,
+          "rationale": "A concise explanation of why this is true or false.",
+          "claims": ["List the main specific claims made in the text"],
+          "suggested_sources": ["Mention specific types of sources to check for verification"]
+        }
+      `;
+    }
 
     async function checkCredibility() {
       const text = $("textInput").value.trim();
       if (!text) {
-        $("status").textContent = "Please enter some text.";
+        $("status").textContent = "❌ Please enter some text.";
         return;
       }
-      $("status").textContent = "Analyzing...";
+
+      // Reset UI
+      $("status").textContent = "🔍 Analyzing with Gemini AI...";
       $("checkBtn").disabled = true;
       $("result").style.display = "none";
 
       try {
+        // Construct the URL correctly
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
+        
         const payload = {
-          contents: [{ role: "user", parts: [{ text: buildPrompt(text) }] }],
+          contents: [{ parts: [{ text: buildPrompt(text) }] }],
           generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 512,
+            temperature: 0.1, // Lower temperature for more factual consistency
             responseMimeType: "application/json"
           }
         };
@@ -133,28 +169,37 @@ REQUIREMENTS:
         });
 
         if (!res.ok) {
-          throw new Error("Gemini API error: " + res.status);
+          const errorData = await res.json();
+          throw new Error(errorData.error?.message || `API Error: ${res.status}`);
         }
 
         const data = await res.json();
-        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+        
         let parsed;
         try {
-          parsed = JSON.parse(raw);
-        } catch {
-          parsed = { label: "UNKNOWN", rationale: "Could not parse model response", confidence: 0, claims: [], suggested_sources: [] };
+          parsed = JSON.parse(rawText);
+        } catch (e) {
+          throw new Error("Failed to parse AI response. Try again.");
         }
 
+        // Update UI with Data
         $("label").textContent = parsed.label || "UNKNOWN";
-        $("confBar").style.width = `${(parsed.confidence || 0) * 100}%`;
-        $("rationale").textContent = parsed.rationale || "";
-        $("claims").innerHTML = (parsed.claims || []).map(c => `<li>${c}</li>`).join("");
-        $("sources").innerHTML = (parsed.suggested_sources || []).map(s => `<li>${s}</li>`).join("");
+        $("label").style.background = (parsed.label === "TRUE") ? "#4ade80" : "#f87171";
+        
+        const confidencePercent = (parsed.confidence || 0) * 100;
+        $("confBar").style.width = `${confidencePercent}%`;
+        $("rationale").textContent = parsed.rationale || "No rationale provided.";
+        
+        $("claims").innerHTML = (parsed.claims || []).map(c => `<li>${c}</li>`).join("") || "<li>No specific claims identified.</li>";
+        $("sources").innerHTML = (parsed.suggested_sources || []).map(s => `<li>${s}</li>`).join("") || "<li>No sources suggested.</li>";
+        
         $("result").style.display = "block";
-        $("status").textContent = "";
+        $("status").textContent = "✅ Analysis Complete";
+
       } catch (err) {
         console.error(err);
-        $("status").textContent = "Error: " + err.message;
+        $("status").textContent = "⚠️ Error: " + err.message;
       } finally {
         $("checkBtn").disabled = false;
       }
@@ -164,4 +209,3 @@ REQUIREMENTS:
   </script>
 </body>
 </html>
-
